@@ -1,0 +1,106 @@
+import java.sql.*;
+import java.util.*;
+
+public class LibraryManagementSystem {
+    static final String DB_URL = "jdbc:mysql://localhost:3306/library_db";
+    static final String USER = "root";
+    static final String PASS = "your_password";
+
+    static Connection conn;
+    static Scanner sc = new Scanner(System.in);
+
+    public static void main(String[] args) {
+        try {
+            conn = DriverManager.getConnection(DB_URL, USER, PASS);
+            createTableIfNotExists();
+
+            while (true) {
+                System.out.println("\nLibrary Management System");
+                System.out.println("1. Add Book\n2. View Books\n3. Search Book\n4. Delete Book\n5. Exit");
+                System.out.print("Enter choice: ");
+                int ch = sc.nextInt();
+                sc.nextLine();
+                switch (ch) {
+                    case 1 -> addBook();
+                    case 2 -> viewBooks();
+                    case 3 -> searchBook();
+                    case 4 -> deleteBook();
+                    case 5 -> {
+                        conn.close();
+                        System.exit(0);
+                    }
+                    default -> System.out.println("Invalid choice!");
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    static void createTableIfNotExists() throws SQLException {
+        Statement stmt = conn.createStatement();
+        String sql = """
+            CREATE TABLE IF NOT EXISTS books (
+                id INT PRIMARY KEY,
+                title VARCHAR(100),
+                author VARCHAR(100)
+            )
+            """;
+        stmt.execute(sql);
+    }
+
+    static void addBook() throws SQLException {
+        System.out.print("Enter Book ID: ");
+        int id = sc.nextInt();
+        sc.nextLine();
+        System.out.print("Enter Book Title: ");
+        String title = sc.nextLine();
+        System.out.print("Enter Author Name: ");
+        String author = sc.nextLine();
+
+        String sql = "INSERT INTO books VALUES (?, ?, ?)";
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, id);
+        pstmt.setString(2, title);
+        pstmt.setString(3, author);
+        pstmt.executeUpdate();
+        System.out.println("Book added successfully.");
+    }
+
+    static void viewBooks() throws SQLException {
+        Statement stmt = conn.createStatement();
+        ResultSet rs = stmt.executeQuery("SELECT * FROM books");
+        System.out.println("ID\tTitle\tAuthor");
+        while (rs.next()) {
+            System.out.println(rs.getInt(1) + "\t" + rs.getString(2) + "\t" + rs.getString(3));
+        }
+    }
+
+    static void searchBook() throws SQLException {
+        System.out.print("Enter Book ID to search: ");
+        int id = sc.nextInt();
+        String sql = "SELECT * FROM books WHERE id = ?";
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, id);
+        ResultSet rs = pstmt.executeQuery();
+        if (rs.next()) {
+            System.out.println("Book found: " + rs.getString("title") + " by " + rs.getString("author"));
+        } else {
+            System.out.println("Book not found.");
+        }
+    }
+
+    static void deleteBook() throws SQLException {
+        System.out.print("Enter Book ID to delete: ");
+        int id = sc.nextInt();
+        String sql = "DELETE FROM books WHERE id = ?";
+        PreparedStatement pstmt = conn.prepareStatement(sql);
+        pstmt.setInt(1, id);
+        int rows = pstmt.executeUpdate();
+        if (rows > 0) {
+            System.out.println("Book deleted successfully.");
+        } else {
+            System.out.println("Book ID not found.");
+        }
+    }
+}
