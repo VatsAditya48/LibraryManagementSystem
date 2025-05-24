@@ -1,106 +1,153 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import java.awt.*;
+import java.awt.event.*;
 import java.sql.*;
-import java.util.*;
 
-public class LibraryManagementSystem {
-    static final String DB_URL = "jdbc:mysql://localhost:3306/library_db";
-    static final String USER = "root";
-    static final String PASS = "your_password";
+public class LibraryGUI extends JFrame {
+    private JTextField idField, titleField, authorField;
+    private JTable bookTable;
+    private DefaultTableModel tableModel;
 
-    static Connection conn;
-    static Scanner sc = new Scanner(System.in);
+    Connection conn;
+    PreparedStatement pst;
 
-    public static void main(String[] args) {
+    public LibraryGUI() {
+        setTitle("Library Management System");
+        setSize(600, 400);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        connectDatabase();
+        createTableIfNotExists();
+        initComponents();
+        loadBooks();
+    }
+
+    private void connectDatabase() {
         try {
-            conn = DriverManager.getConnection(DB_URL, USER, PASS);
-            createTableIfNotExists();
+            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/library_db", "root", "your_password");
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Database Connection Failed!");
+            System.exit(1);
+        }
+    }
 
-            while (true) {
-                System.out.println("\nLibrary Management System");
-                System.out.println("1. Add Book\n2. View Books\n3. Search Book\n4. Delete Book\n5. Exit");
-                System.out.print("Enter choice: ");
-                int ch = sc.nextInt();
-                sc.nextLine();
-                switch (ch) {
-                    case 1 -> addBook();
-                    case 2 -> viewBooks();
-                    case 3 -> searchBook();
-                    case 4 -> deleteBook();
-                    case 5 -> {
-                        conn.close();
-                        System.exit(0);
-                    }
-                    default -> System.out.println("Invalid choice!");
-                }
-            }
+    private void createTableIfNotExists() {
+        try (Statement stmt = conn.createStatement()) {
+            String sql = """
+                CREATE TABLE IF NOT EXISTS books (
+                    id INT PRIMARY KEY,
+                    title VARCHAR(100),
+                    author VARCHAR(100)
+                )
+            """;
+            stmt.execute(sql);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    static void createTableIfNotExists() throws SQLException {
-        Statement stmt = conn.createStatement();
-        String sql = """
-            CREATE TABLE IF NOT EXISTS books (
-                id INT PRIMARY KEY,
-                title VARCHAR(100),
-                author VARCHAR(100)
-            )
-            """;
-        stmt.execute(sql);
+    private void initComponents() {
+        JPanel panel = new JPanel(new GridLayout(5, 2, 5, 5));
+        idField = new JTextField();
+        titleField = new JTextField();
+        authorField = new JTextField();
+
+        panel.add(new JLabel("Book ID:"));
+        panel.add(idField);
+        panel.add(new JLabel("Title:"));
+        panel.add(titleField);
+        panel.add(new JLabel("Author:"));
+        panel.add(authorField);
+
+        JButton addButton = new JButton("Add");
+        JButton deleteButton = new JButton("Delete");
+        JButton searchButton = new JButton("Search");
+        JButton refreshButton = new JButton("Refresh");
+
+        addButton.addActionListener(e -> addBook());
+        deleteButton.addActionListener(e -> deleteBook());
+        searchButton.addActionListener(e -> searchBook());
+        refreshButton.addActionListener(e -> loadBooks());
+
+        panel.add(addButton);
+        panel.add(deleteButton);
+        panel.add(searchButton);
+        panel.add(refreshButton);
+
+        add(panel, BorderLayout.NORTH);
+
+        tableModel = new DefaultTableModel(new String[]{"ID", "Title", "Author"}, 0);
+        bookTable = new JTable(tableModel);
+        add(new JScrollPane(bookTable), BorderLayout.CENTER);
     }
 
-    static void addBook() throws SQLException {
-        System.out.print("Enter Book ID: ");
-        int id = sc.nextInt();
-        sc.nextLine();
-        System.out.print("Enter Book Title: ");
-        String title = sc.nextLine();
-        System.out.print("Enter Author Name: ");
-        String author = sc.nextLine();
-
-        String sql = "INSERT INTO books VALUES (?, ?, ?)";
-        PreparedStatement pstmt = conn.prepareStatement(sql);
-        pstmt.setInt(1, id);
-        pstmt.setString(2, title);
-        pstmt.setString(3, author);
-        pstmt.executeUpdate();
-        System.out.println("Book added successfully.");
-    }
-
-    static void viewBooks() throws SQLException {
-        Statement stmt = conn.createStatement();
-        ResultSet rs = stmt.executeQuery("SELECT * FROM books");
-        System.out.println("ID\tTitle\tAuthor");
-        while (rs.next()) {
-            System.out.println(rs.getInt(1) + "\t" + rs.getString(2) + "\t" + rs.getString(3));
+    private void addBook() {
+        try {
+            String sql = "INSERT INTO books VALUES (?, ?, ?)";
+            pst = conn.prepareStatement(sql);
+            pst.setInt(1, Integer.parseInt(idField.getText()));
+            pst.setString(2, titleField.getText());
+            pst.setString(3, authorField.getText());
+            pst.executeUpdate();
+            JOptionPane.showMessageDialog(this, "Book Added!");
+            loadBooks();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error Adding Book!");
         }
     }
 
-    static void searchBook() throws SQLException {
-        System.out.print("Enter Book ID to search: ");
-        int id = sc.nextInt();
-        String sql = "SELECT * FROM books WHERE id = ?";
-        PreparedStatement pstmt = conn.prepareStatement(sql);
-        pstmt.setInt(1, id);
-        ResultSet rs = pstmt.executeQuery();
-        if (rs.next()) {
-            System.out.println("Book found: " + rs.getString("title") + " by " + rs.getString("author"));
-        } else {
-            System.out.println("Book not found.");
+    private void deleteBook() {
+        try {
+            String sql = "DELETE FROM books WHERE id = ?";
+            pst = conn.prepareStatement(sql);
+            pst.setInt(1, Integer.parseInt(idField.getText()));
+            pst.executeUpdate();
+            JOptionPane.showMessageDialog(this, "Book Deleted!");
+            loadBooks();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error Deleting Book!");
         }
     }
 
-    static void deleteBook() throws SQLException {
-        System.out.print("Enter Book ID to delete: ");
-        int id = sc.nextInt();
-        String sql = "DELETE FROM books WHERE id = ?";
-        PreparedStatement pstmt = conn.prepareStatement(sql);
-        pstmt.setInt(1, id);
-        int rows = pstmt.executeUpdate();
-        if (rows > 0) {
-            System.out.println("Book deleted successfully.");
-        } else {
-            System.out.println("Book ID not found.");
+    private void searchBook() {
+        try {
+            String sql = "SELECT * FROM books WHERE id = ?";
+            pst = conn.prepareStatement(sql);
+            pst.setInt(1, Integer.parseInt(idField.getText()));
+            ResultSet rs = pst.executeQuery();
+            tableModel.setRowCount(0);
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                        rs.getInt("id"),
+                        rs.getString("title"),
+                        rs.getString("author")
+                });
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error Searching Book!");
         }
+    }
+
+    private void loadBooks() {
+        try {
+            Statement stmt = conn.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM books");
+            tableModel.setRowCount(0);
+            while (rs.next()) {
+                tableModel.addRow(new Object[]{
+                        rs.getInt("id"),
+                        rs.getString("title"),
+                        rs.getString("author")
+                });
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Error Loading Books!");
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new LibraryGUI().setVisible(true));
     }
 }
