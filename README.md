@@ -64,4 +64,4 @@ This is a Java Swing-based Library Management System that uses MySQL to store an
 
 ## Author
 
-Aditya Vatsa , Depanshu Dubey , Harsh Raj
+Aditya Vatsa , Depanshu Dubey , Harsh Raj ,Hridesh Shukla
