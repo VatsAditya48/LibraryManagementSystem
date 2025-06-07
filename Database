@@ -1,0 +1,69 @@
+package db;
+
+import javax.swing.*;
+import java.sql.*;
+
+public class DatabaseHelper {
+    private static Connection conn;
+
+    static {
+        try {
+            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/library_db", "root", "your_password");
+            createTableIfNotExists();
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(null, "Database Connection Failed!\n" + e.getMessage());
+            System.exit(1);
+        }
+    }
+
+    private static void createTableIfNotExists() throws SQLException {
+        String sql = """
+            CREATE TABLE IF NOT EXISTS books (
+                id INT PRIMARY KEY,
+                title VARCHAR(100),
+                author VARCHAR(100)
+            )
+        """;
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute(sql);
+        }
+    }
+
+    public static boolean addBook(int id, String title, String author) throws SQLException {
+        String checkSql = "SELECT id FROM books WHERE id = ?";
+        try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
+            checkStmt.setInt(1, id);
+            ResultSet rs = checkStmt.executeQuery();
+            if (rs.next()) return false; // ID exists
+        }
+
+        String insertSql = "INSERT INTO books VALUES (?, ?, ?)";
+        try (PreparedStatement pst = conn.prepareStatement(insertSql)) {
+            pst.setInt(1, id);
+            pst.setString(2, title);
+            pst.setString(3, author);
+            pst.executeUpdate();
+            return true;
+        }
+    }
+
+    public static boolean deleteBook(int id) throws SQLException {
+        String sql = "DELETE FROM books WHERE id = ?";
+        try (PreparedStatement pst = conn.prepareStatement(sql)) {
+            pst.setInt(1, id);
+            return pst.executeUpdate() > 0;
+        }
+    }
+
+    public static ResultSet searchBookByTitle(String title) throws SQLException {
+        String sql = "SELECT * FROM books WHERE title LIKE ?";
+        PreparedStatement pst = conn.prepareStatement(sql);
+        pst.setString(1, "%" + title + "%");
+        return pst.executeQuery();
+    }
+
+    public static ResultSet getAllBooks() throws SQLException {
+        Statement stmt = conn.createStatement();
+        return stmt.executeQuery("SELECT * FROM books");
+    }
+}
