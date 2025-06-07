@@ -1,3 +1,7 @@
+package gui;
+
+import db.DatabaseHelper;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -9,43 +13,14 @@ public class LibraryGUI extends JFrame {
     private JTable bookTable;
     private DefaultTableModel tableModel;
 
-    Connection conn;
-    PreparedStatement pst;
-
     public LibraryGUI() {
         setTitle("Library Management System");
-        setSize(600, 400);
+        setSize(700, 450);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(EXIT_ON_CLOSE);
 
-        connectDatabase();
-        createTableIfNotExists();
         initComponents();
         loadBooks();
-    }
-
-    private void connectDatabase() {
-        try {
-            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/library_db", "root", "your_password");
-        } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Database Connection Failed!");
-            System.exit(1);
-        }
-    }
-
-    private void createTableIfNotExists() {
-        try (Statement stmt = conn.createStatement()) {
-            String sql = """
-                CREATE TABLE IF NOT EXISTS books (
-                    id INT PRIMARY KEY,
-                    title VARCHAR(100),
-                    author VARCHAR(100)
-                )
-            """;
-            stmt.execute(sql);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 
     private void initComponents() {
@@ -63,12 +38,12 @@ public class LibraryGUI extends JFrame {
 
         JButton addButton = new JButton("Add");
         JButton deleteButton = new JButton("Delete");
-        JButton searchButton = new JButton("Search");
+        JButton searchButton = new JButton("Search (By Title)");
         JButton refreshButton = new JButton("Refresh");
 
         addButton.addActionListener(e -> addBook());
         deleteButton.addActionListener(e -> deleteBook());
-        searchButton.addActionListener(e -> searchBook());
+        searchButton.addActionListener(e -> searchBookByTitle());
         refreshButton.addActionListener(e -> loadBooks());
 
         panel.add(addButton);
@@ -84,39 +59,64 @@ public class LibraryGUI extends JFrame {
     }
 
     private void addBook() {
+        String idText = idField.getText().trim();
+        String title = titleField.getText().trim();
+        String author = authorField.getText().trim();
+
+        if (idText.isEmpty() || title.isEmpty() || author.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "All fields are required.");
+            return;
+        }
+
         try {
-            String sql = "INSERT INTO books VALUES (?, ?, ?)";
-            pst = conn.prepareStatement(sql);
-            pst.setInt(1, Integer.parseInt(idField.getText()));
-            pst.setString(2, titleField.getText());
-            pst.setString(3, authorField.getText());
-            pst.executeUpdate();
-            JOptionPane.showMessageDialog(this, "Book Added!");
-            loadBooks();
+            int id = Integer.parseInt(idText);
+            if (DatabaseHelper.addBook(id, title, author)) {
+                JOptionPane.showMessageDialog(this, "Book Added!");
+                loadBooks();
+            } else {
+                JOptionPane.showMessageDialog(this, "Book ID already exists.");
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Book ID must be a number.");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error Adding Book!");
+            JOptionPane.showMessageDialog(this, "Error Adding Book!\n" + e.getMessage());
         }
     }
 
     private void deleteBook() {
+        String idText = idField.getText().trim();
+        if (idText.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Enter Book ID to delete.");
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete this book?", "Confirm", JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
         try {
-            String sql = "DELETE FROM books WHERE id = ?";
-            pst = conn.prepareStatement(sql);
-            pst.setInt(1, Integer.parseInt(idField.getText()));
-            pst.executeUpdate();
-            JOptionPane.showMessageDialog(this, "Book Deleted!");
-            loadBooks();
+            int id = Integer.parseInt(idText);
+            if (DatabaseHelper.deleteBook(id)) {
+                JOptionPane.showMessageDialog(this, "Book Deleted!");
+                loadBooks();
+            } else {
+                JOptionPane.showMessageDialog(this, "Book ID not found.");
+            }
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Book ID must be numeric.");
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error Deleting Book!");
+            JOptionPane.showMessageDialog(this, "Error Deleting Book!\n" + e.getMessage());
         }
     }
 
-    private void searchBook() {
+    private void searchBookByTitle() {
+        String title = titleField.getText().trim();
+        if (title.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Enter a title to search.");
+            return;
+        }
+
         try {
-            String sql = "SELECT * FROM books WHERE id = ?";
-            pst = conn.prepareStatement(sql);
-            pst.setInt(1, Integer.parseInt(idField.getText()));
-            ResultSet rs = pst.executeQuery();
+            ResultSet rs = DatabaseHelper.searchBookByTitle(title);
             tableModel.setRowCount(0);
             while (rs.next()) {
                 tableModel.addRow(new Object[]{
@@ -126,14 +126,13 @@ public class LibraryGUI extends JFrame {
                 });
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error Searching Book!");
+            JOptionPane.showMessageDialog(this, "Error Searching Book!\n" + e.getMessage());
         }
     }
 
     private void loadBooks() {
         try {
-            Statement stmt = conn.createStatement();
-            ResultSet rs = stmt.executeQuery("SELECT * FROM books");
+            ResultSet rs = DatabaseHelper.getAllBooks();
             tableModel.setRowCount(0);
             while (rs.next()) {
                 tableModel.addRow(new Object[]{
@@ -143,7 +142,7 @@ public class LibraryGUI extends JFrame {
                 });
             }
         } catch (Exception e) {
-            JOptionPane.showMessageDialog(this, "Error Loading Books!");
+            JOptionPane.showMessageDialog(this, "Error Loading Books!\n" + e.getMessage());
         }
     }
 
